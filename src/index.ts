@@ -1,25 +1,38 @@
 import express, { Request, Response } from "express";
+import nodemailer from "nodemailer";
+import User from "./types/User";
 
 const app = express();
 
-type User = {
-  id: String;
-  username: String;
-  password: String;
-  verified: Boolean;
-};
-
-type UserVerification = {
-  userId: String;
-  uniqueString: String;
-  createdAt: Date;
-  spiresAt: Date;
-};
+const transporter = nodemailer.createTransport({
+  service: "gmail",
+  auth: {
+    user: process.env.AUTH_EMAIL,
+    pass: process.env.AUTH_PASS,
+  },
+});
+transporter.verify((error, success) => {
+  if (success) {
+    return console.log("Ready for messages");
+  }
+  console.error(error);
+});
 
 const users: User[] = [];
 
-app.get("/", (req: Request, res: Response) => {
+app.get("/users", (req: Request, res: Response) => {
   res.json(users);
 });
 
-app.listen(3000, () => console.log("server runing"));
+app.post("/users/signup", (req: Request, res: Response) => {
+  users.push({
+    id: crypto.randomUUID(),
+    user: req.body.user,
+    pass: req.body.pass, //TODO: encript with crypto??
+    verified: false,
+  });
+
+  //TODO: send verification email
+});
+
+app.listen(3000, () => console.log("Server runing"));
