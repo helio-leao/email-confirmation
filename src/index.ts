@@ -1,4 +1,4 @@
-import express, { Request, Response } from "express";
+import express from "express";
 import nodemailer from "nodemailer";
 import User from "./types/User";
 import UserVerification from "./types/UserVerification";
@@ -23,8 +23,8 @@ transporter.verify((error, success) => {
 const users: User[] = [];
 let userVerifications: UserVerification[] = [];
 
-app.post("/users/signup", (req: Request, res: Response) => {
-  const newUser = {
+app.post("/users/signup", (req, res) => {
+  const newUser: User = {
     id: crypto.randomUUID(),
     email: req.body.email,
     password: req.body.password,
@@ -33,12 +33,24 @@ app.post("/users/signup", (req: Request, res: Response) => {
 
   users.push(newUser);
 
-  sendVerificationEmail(newUser, res);
+  try {
+    sendVerificationEmail(newUser);
+    res.json({
+      ok: true,
+      message: "Verification email sent",
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({
+      ok: false,
+      message: "Could not send verification email",
+    });
+  }
 });
 
-app.get("/users/verify/:id/:uniqueString", (req: Request, res: Response) => {
+app.get("/users/verify/:userId/:uniqueString", (req, res) => {
   const userVerification = userVerifications.find(
-    ({ userId }) => userId === req.params.id
+    ({ userId }) => userId === req.params.userId
   );
 
   if (!userVerification) {
@@ -49,16 +61,18 @@ app.get("/users/verify/:id/:uniqueString", (req: Request, res: Response) => {
     return;
   }
 
-  if (userVerification.expiresAt < Date.now()) {
+  const { userId, uniqueString, expiresAt } = userVerification;
+
+  if (expiresAt < Date.now()) {
     res.status(401).json({
       ok: false,
       message: "Unique string expired",
     });
-    removeUserVerification(userVerification.userId);
+    removeUserVerification(userId);
     return;
   }
 
-  if (userVerification.uniqueString !== req.params.uniqueString) {
+  if (uniqueString !== req.params.uniqueString) {
     res.status(401).json({
       ok: false,
       message: "Unique string invalid",
@@ -66,15 +80,8 @@ app.get("/users/verify/:id/:uniqueString", (req: Request, res: Response) => {
     return;
   }
 
-  // change verified status from user
-  for (let i = 0; i < users.length; i++) {
-    if (users[i].id === userVerification.userId) {
-      users[i].verified = true;
-      break;
-    }
-  }
-
-  removeUserVerification(userVerification.userId);
+  updateVerifiedUser(userId);
+  removeUserVerification(userId);
 
   res.json({
     ok: true,
@@ -82,13 +89,22 @@ app.get("/users/verify/:id/:uniqueString", (req: Request, res: Response) => {
   });
 });
 
+function updateVerifiedUser(userId: string) {
+  for (let i = 0; i < users.length; i++) {
+    if (users[i].id === userId) {
+      users[i].verified = true;
+      break;
+    }
+  }
+}
+
 function removeUserVerification(userId: string) {
   userVerifications = userVerifications.filter(
     (userVerification) => userVerification.userId !== userId
   );
 }
 
-function sendVerificationEmail(user: User, res: Response) {
+function sendVerificationEmail(user: User) {
   const { id, email } = user;
 
   const currentUrl = "http://localhost:3000";
@@ -112,26 +128,18 @@ function sendVerificationEmail(user: User, res: Response) {
 
   try {
     transporter.sendMail(mailOptions);
-    res.json({
-      ok: true,
-      message: "Verification email sent",
-    });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({
-      ok: false,
-      message: "Could not send verification email",
-    });
+    throw error;
   }
 }
 
 // testing
-app.get("/users", (req: Request, res: Response) => {
+app.get("/users", (req, res) => {
   res.json(users);
 });
 
 // testing
-app.get("/userVerifications", (req: Request, res: Response) => {
+app.get("/userVerifications", (req, res) => {
   res.json(userVerifications);
 });
 
