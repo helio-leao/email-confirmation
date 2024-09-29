@@ -49,9 +49,7 @@ app.post("/users/signup", (req, res) => {
 });
 
 app.get("/users/verify/:userId/:uniqueString", (req, res) => {
-  const userVerification = userVerifications.find(
-    ({ userId }) => userId === req.params.userId
-  );
+  const userVerification = findUserVerification(req.params.userId);
 
   if (!userVerification) {
     res.status(404).json({
@@ -82,12 +80,18 @@ app.get("/users/verify/:userId/:uniqueString", (req, res) => {
 
   updateVerifiedUser(userId);
   removeUserVerification(userId);
-
   res.json({
     ok: true,
     message: "User verified",
   });
 });
+
+function findUserVerification(userId: string) {
+  const userVerification = userVerifications.find(
+    (verification) => verification.userId === userId
+  );
+  return userVerification;
+}
 
 function updateVerifiedUser(userId: string) {
   for (let i = 0; i < users.length; i++) {
