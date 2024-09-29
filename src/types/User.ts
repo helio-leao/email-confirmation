@@ -1,6 +1,6 @@
 export default interface User {
-  id: String;
-  user: String;
-  pass: String;
-  verified: Boolean;
+  id: string;
+  email: string;
+  password: string;
+  verified: boolean;
 }

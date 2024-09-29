@@ -1,8 +1,10 @@
 import express, { Request, Response } from "express";
 import nodemailer from "nodemailer";
 import User from "./types/User";
+import UserVerification from "./types/UserVerification";
 
 const app = express();
+app.use(express.json());
 
 const transporter = nodemailer.createTransport({
   service: "gmail",
@@ -19,20 +21,118 @@ transporter.verify((error, success) => {
 });
 
 const users: User[] = [];
+let userVerifications: UserVerification[] = [];
 
+app.post("/users/signup", (req: Request, res: Response) => {
+  const newUser = {
+    id: crypto.randomUUID(),
+    email: req.body.email,
+    password: req.body.password,
+    verified: false,
+  };
+
+  users.push(newUser);
+
+  sendVerificationEmail(newUser, res);
+});
+
+app.get("/users/verify/:id/:uniqueString", (req: Request, res: Response) => {
+  const userVerification = userVerifications.find(
+    ({ userId }) => userId === req.params.id
+  );
+
+  if (!userVerification) {
+    res.status(404).json({
+      ok: false,
+      message: "Not found",
+    });
+    return;
+  }
+
+  if (userVerification.expiresAt < Date.now()) {
+    res.status(401).json({
+      ok: false,
+      message: "Unique string expired",
+    });
+    removeUserVerification(userVerification.userId);
+    return;
+  }
+
+  if (userVerification.uniqueString !== req.params.uniqueString) {
+    res.status(401).json({
+      ok: false,
+      message: "Unique string invalid",
+    });
+    return;
+  }
+
+  // change verified status from user
+  for (let i = 0; i < users.length; i++) {
+    if (users[i].id === userVerification.userId) {
+      users[i].verified = true;
+      break;
+    }
+  }
+
+  removeUserVerification(userVerification.userId);
+
+  res.json({
+    ok: true,
+    message: "User verified",
+  });
+});
+
+function removeUserVerification(userId: string) {
+  userVerifications = userVerifications.filter(
+    (userVerification) => userVerification.userId !== userId
+  );
+}
+
+function sendVerificationEmail(user: User, res: Response) {
+  const { id, email } = user;
+
+  const currentUrl = "http://localhost:3000";
+  const uniqueString = crypto.randomUUID() + user.id;
+
+  const mailOptions = {
+    from: process.env.AUTH_EMAIL,
+    to: email,
+    subject: "Verify Your Email",
+    html: `<p>Verify your email address to complete de signup and login into your account</p><p>This link <b>expires in 6 hours</b></p><p>Press <a href=${
+      currentUrl + "/users/verify/" + id + "/" + uniqueString
+    }>here</a> to proceed</p>`,
+  };
+
+  userVerifications.push({
+    userId: id,
+    uniqueString: uniqueString,
+    createdAt: Date.now(),
+    expiresAt: Date.now() + 21600000, //Note: 6 hours ahead
+  });
+
+  try {
+    transporter.sendMail(mailOptions);
+    res.json({
+      ok: true,
+      message: "Verification email sent",
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({
+      ok: false,
+      message: "Could not send verification email",
+    });
+  }
+}
+
+// testing
 app.get("/users", (req: Request, res: Response) => {
   res.json(users);
 });
 
-app.post("/users/signup", (req: Request, res: Response) => {
-  users.push({
-    id: crypto.randomUUID(),
-    user: req.body.user,
-    pass: req.body.pass, //TODO: encript with crypto??
-    verified: false,
-  });
-
-  //TODO: send verification email
+// testing
+app.get("/userVerifications", (req: Request, res: Response) => {
+  res.json(userVerifications);
 });
 
 app.listen(3000, () => console.log("Server runing"));
