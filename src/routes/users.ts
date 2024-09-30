@@ -1,22 +1,33 @@
 import express from "express";
 import Users from "../storage/Users";
 import UserVerifications from "../storage/UserVerifications";
-import sendVerificationEmail from "../services/verificationService";
+import sendVerificationEmail from "../services/verificationEmailService";
 
 const router = express.Router();
 
-router.post("/signup", (req, res) => {
+router.post("/signup", async (req, res) => {
   const newUser = {
     id: crypto.randomUUID(),
     email: req.body.email,
     password: req.body.password,
     verified: false,
   };
+  const newUserVerification = {
+    userId: newUser.id,
+    uniqueString: crypto.randomUUID(),
+    createdAt: Date.now(),
+    expiresAt: Date.now() + 21600000, // 6 hours ahead
+  };
 
   Users.add(newUser);
+  UserVerifications.add(newUserVerification);
 
   try {
-    sendVerificationEmail(newUser);
+    await sendVerificationEmail(
+      newUser.id,
+      newUser.email,
+      newUserVerification.uniqueString
+    );
     res.json({
       ok: true,
       message: "Verification email sent",
@@ -62,6 +73,7 @@ router.get("/verify/:userId/:uniqueString", (req, res) => {
 
   Users.updateVerifiedUser(userId);
   UserVerifications.remove(userId);
+
   res.json({
     ok: true,
     message: "User verified",
