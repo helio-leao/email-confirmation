@@ -6,4 +6,6 @@ app.use(express.json());
 
 app.use("/users", userRoutes);
 
-app.listen(3000, () => console.log("Server runing"));
+app.listen(process.env.PORT, () =>
+  console.log(`Server runing on port ${process.env.PORT}...`)
+);
