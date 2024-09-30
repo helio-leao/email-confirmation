@@ -1,11 +1,11 @@
 import express from "express";
 import Users from "../storage/Users";
 import UserVerifications from "../storage/UserVerifications";
-import sendVerificationEmail from "../services/verificationEmailService";
+import sendVerificationEmail from "../services/emailService";
 
 const router = express.Router();
 
-router.post("/signup", async (req, res) => {
+router.post("/signup", (req, res) => {
   const newUser = {
     id: crypto.randomUUID(),
     email: req.body.email,
@@ -22,11 +22,23 @@ router.post("/signup", async (req, res) => {
   UserVerifications.add(newUserVerification);
 
   try {
-    await sendVerificationEmail(
-      newUser.id,
-      newUser.email,
-      newUserVerification.uniqueString
-    );
+    sendVerificationEmail({
+      to: newUser.email,
+      subject: "Verify Your Email",
+      html: `
+        <p>Verify your email address to complete de signup and login into your account</p>
+        <p>This link <b>expires in 6 hours</b></p>
+        <p>
+          Press <a href=${
+            process.env.BASE_URL +
+            "/auth/verify/" +
+            newUser.id +
+            "/" +
+            newUserVerification.uniqueString
+          }>here</a> to proceed
+        </p>
+      `,
+    });
     res.json({
       ok: true,
       message: "Verification email sent",
