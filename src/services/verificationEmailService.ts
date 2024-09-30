@@ -14,7 +14,7 @@ const sendVerificationEmail = async (
       <p>This link <b>expires in 6 hours</b></p>
       <p>
         Press <a href=${
-          process.env.BASE_URL + "/users/verify/" + userId + "/" + uniqueString
+          process.env.BASE_URL + "/auth/verify/" + userId + "/" + uniqueString
         }>here</a> to proceed
       </p>
     `,
