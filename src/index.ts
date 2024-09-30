@@ -1,7 +1,8 @@
 import express from "express";
 import nodemailer from "nodemailer";
 import User from "./types/User";
-import UserVerification from "./types/UserVerification";
+import Users from "./storage/Users";
+import UserVerifications from "./storage/UserVerifications";
 
 const app = express();
 app.use(express.json());
@@ -20,18 +21,15 @@ transporter.verify((error, success) => {
   console.error(error);
 });
 
-const users: User[] = [];
-let userVerifications: UserVerification[] = [];
-
 app.post("/users/signup", (req, res) => {
-  const newUser: User = {
+  const newUser = {
     id: crypto.randomUUID(),
     email: req.body.email,
     password: req.body.password,
     verified: false,
   };
 
-  users.push(newUser);
+  Users.add(newUser);
 
   try {
     sendVerificationEmail(newUser);
@@ -49,7 +47,7 @@ app.post("/users/signup", (req, res) => {
 });
 
 app.get("/users/verify/:userId/:uniqueString", (req, res) => {
-  const userVerification = findUserVerification(req.params.userId);
+  const userVerification = UserVerifications.find(req.params.userId);
 
   if (!userVerification) {
     res.status(404).json({
@@ -66,7 +64,7 @@ app.get("/users/verify/:userId/:uniqueString", (req, res) => {
       ok: false,
       message: "Unique string expired",
     });
-    removeUserVerification(userId);
+    UserVerifications.remove(userId);
     return;
   }
 
@@ -78,35 +76,13 @@ app.get("/users/verify/:userId/:uniqueString", (req, res) => {
     return;
   }
 
-  updateVerifiedUser(userId);
-  removeUserVerification(userId);
+  Users.updateVerifiedUser(userId);
+  UserVerifications.remove(userId);
   res.json({
     ok: true,
     message: "User verified",
   });
 });
-
-function findUserVerification(userId: string) {
-  const userVerification = userVerifications.find(
-    (verification) => verification.userId === userId
-  );
-  return userVerification;
-}
-
-function updateVerifiedUser(userId: string) {
-  for (let i = 0; i < users.length; i++) {
-    if (users[i].id === userId) {
-      users[i].verified = true;
-      break;
-    }
-  }
-}
-
-function removeUserVerification(userId: string) {
-  userVerifications = userVerifications.filter(
-    (userVerification) => userVerification.userId !== userId
-  );
-}
 
 function sendVerificationEmail(user: User) {
   const { id, email } = user;
@@ -123,7 +99,7 @@ function sendVerificationEmail(user: User) {
     }>here</a> to proceed</p>`,
   };
 
-  userVerifications.push({
+  UserVerifications.add({
     userId: id,
     uniqueString: uniqueString,
     createdAt: Date.now(),
@@ -139,12 +115,12 @@ function sendVerificationEmail(user: User) {
 
 // testing
 app.get("/users", (req, res) => {
-  res.json(users);
+  res.json(Users.getAll());
 });
 
 // testing
 app.get("/userVerifications", (req, res) => {
-  res.json(userVerifications);
+  res.json(UserVerifications.getAll());
 });
 
 app.listen(3000, () => console.log("Server runing"));
