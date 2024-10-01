@@ -23,4 +23,13 @@ export default class Users {
       }
     }
   }
+
+  static updatePassword(userId: string, password: string) {
+    for (let i = 0; i < this.users.length; i++) {
+      if (this.users[i].id === userId) {
+        this.users[i].password = password;
+        break;
+      }
+    }
+  }
 }
